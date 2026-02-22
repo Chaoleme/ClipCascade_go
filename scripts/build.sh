@@ -100,13 +100,10 @@ build_desktop_cross() {
         warn "    ⚠ 跳过 macOS 构建 (CGO 需要在 macOS 主机编译)"
     fi
     
-    # 2. Windows - 使用 MinGW 交叉编译
-    info "  → 编译中: windows/amd64"
-    if command -v x86_64-w64-mingw32-gcc &>/dev/null; then
-        GOOS=windows GOARCH=amd64 CGO_ENABLED=1 CC=x86_64-w64-mingw32-gcc go build -ldflags="$LDFLAGS -H=windowsgui" -o "$BUILD_DIR/clipcascade-desktop-windows-amd64.exe" . || warn "    ⚠ windows/amd64 编译失败"
-    else
-        warn "    ⚠ 未找到 x86_64-w64-mingw32-gcc，跳过 Windows 交叉编译 (请运行: brew install mingw-w64)"
-    fi
+    # 2. Windows - 因为我们全程实现了纯 Go 的剪贴板钩子，Windows 端现己支持 100% 无 CGO 跨平台编译！再也不需要 MinGW 了！
+    info "  → 编译中: windows/amd64 (100% Pure Go)"
+    GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="$LDFLAGS -H=windowsgui" -o "$BUILD_DIR/clipcascade-desktop-windows-amd64.exe" . || warn "    ⚠ windows/amd64 编译失败"
+
 
     # 3. Linux - 使用 Docker 交叉编译 (由于依赖 GTK3)
     info "  → 编译中: linux/amd64 (通过 Docker)"

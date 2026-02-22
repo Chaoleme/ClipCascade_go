@@ -77,18 +77,20 @@ make clean            # 清理构建产物
 ## 🛠 各平台开发指南 (高级)
 
 ### 1. 服务端 (Server)
-纯 Go 编写，无 CGO 依赖，支持完美交叉编译。
+纯 Go 编写，无任何外置依赖，支持完美交叉编译。
 - **全平台打包**: `./scripts/build.sh server-cross`
 
-### 2. 桌面客户端 (Desktop)
-涉及 **CGO 调用系统图形库**。
-- **原则**: **必须在目标系统中进行原生构建**。
-- **Linux 依赖**: `sudo apt install libgtk-3-dev libx11-dev libayatana-appindicator3-dev pkg-config`
-- **注意**: 桌面端建议在对应的物理机中构建，以确保托盘等 GUI 功能完整。
+### 2. 桌面客户端 (Desktop - 100% 纯 Go)
+桌面客户端经过重构，**移除了所有 CGO 依赖**。这意味着您可以直接在 Mac 上完美交叉编译 Windows 甚至 Linux 客户端，而无需安装 `MinGW` 等复杂的 C 语言交叉编译工具链。
+- **本地构建**: `./scripts/build.sh desktop`
+- **交叉编译 (所有平台)**: `./scripts/build.sh cross` (全尺寸编译，一键输出 Mac/Win/Linux 原生程序)
+- **大文件同步特点**: 采用零附加开销的 **“懒加载 (按需传输)”** 架构。复制大文件时仅广播极小的文件路径和大小占位符，只有在对端真正按下 `Ctrl+V` 时，才会触发底层的实时分块数据对传，极大节省系统内存。
 
-### 3. 移动端 (Mobile)
-- **Android**: `./scripts/build.sh mobile-android`
-- **iOS**: `./scripts/build.sh mobile-ios` (仅限 macOS)
+### 3. 移动端 (Mobile - Fyne UI)
+原有的 Android/iOS 复杂原生壳工程已被彻底废弃。现在的移动端是一个基于 `fyne.io/fyne/v2` 构建的 **纯 Go 单文件极简应用**。
+- **Android**: 执行 `fyne package -os android` (需安装基础 Android SDK)
+- **iOS**: 执行 `fyne package -os ios` (仅限 macOS)
+- **注意**: 受限于现代移动操作系统的后台安全限制，由于我们使用的是纯 UI 框架，剪贴板的收发需要在 App **处于前台活动状态**时触发。
 
 ---
 

@@ -38,6 +38,9 @@ func (m *Manager) OnCopy(fn func(payload string, payloadType string)) {
 // Watch 开始监控剪贴板的文本和图像更改。
 // 它一直运行，直到 context 被取消。
 func (m *Manager) Watch(ctx context.Context) {
+	// 启动零 CGO 的大文件系统路径监控轮询
+	m.startPlatformFileWatcher()
+
 	// 监控文本更改
 	textCh := clipboard.Watch(ctx, clipboard.FmtText)
 	// 监控图像更改

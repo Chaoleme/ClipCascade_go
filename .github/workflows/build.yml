@@ -95,7 +95,7 @@ jobs:
             goos: darwin
             goarch: arm64
           - os: macos-amd64
-            runner: macos-13
+            runner: macos-14
             goos: darwin
             goarch: amd64
           - os: windows-amd64

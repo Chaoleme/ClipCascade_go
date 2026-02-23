@@ -28,11 +28,11 @@ jobs:
           cd pkg && go mod tidy
           cd ../server && go mod tidy
           cd ../desktop && go mod tidy
-          cd ../mobile && go mod tidy
+          cd ../fyne_mobile && go mod tidy
       - name: Run tests
-        run: go test -v -race ./pkg/... ./server/... ./mobile/...
+        run: go test -v -race ./pkg/... ./server/... ./fyne_mobile/...
       - name: Vet
-        run: go vet ./pkg/... ./server/... ./mobile/...
+        run: go vet ./pkg/... ./server/... ./fyne_mobile/...
 
   # ──────────────── Build Server ────────────────
   build-server:

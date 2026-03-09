@@ -3,10 +3,12 @@ package config
 
 import (
 	"encoding/json"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strconv"
+	"strings"
 
 	"github.com/clipcascade/pkg/constants"
 )
@@ -69,6 +71,7 @@ func Load() *Config {
 	}
 	_ = json.Unmarshal(data, cfg)
 	cfg.FilePath = cfgPath
+	cfg.ServerURL = NormalizeServerURL(cfg.ServerURL)
 	if envPassword := os.Getenv("CLIPCASCADE_PASSWORD"); envPassword != "" {
 		cfg.Password = envPassword
 	}
@@ -81,6 +84,7 @@ func (c *Config) Save() error {
 		return err
 	}
 	toSave := *c
+	toSave.ServerURL = NormalizeServerURL(toSave.ServerURL)
 	// 当使用环境变量注入密码时，避免将密码明文持久化到磁盘。
 	if os.Getenv("CLIPCASCADE_PASSWORD") != "" {
 		toSave.Password = ""
@@ -90,4 +94,49 @@ func (c *Config) Save() error {
 		return err
 	}
 	return os.WriteFile(c.FilePath, data, 0600)
+}
+
+// SaveServerURLOnly 仅持久化 server_url，避免无意覆盖用户名/密码等配置。
+func (c *Config) SaveServerURLOnly(serverURL string) error {
+	cfgPath := c.FilePath
+	if cfgPath == "" {
+		cfgPath = filepath.Join(ConfigDir(), "config.json")
+	}
+	if err := os.MkdirAll(filepath.Dir(cfgPath), 0755); err != nil {
+		return err
+	}
+
+	// 优先保留现有文件中的其余字段，只替换 server_url。
+	existing := DefaultConfig()
+	existing.FilePath = cfgPath
+	if data, err := os.ReadFile(cfgPath); err == nil {
+		_ = json.Unmarshal(data, existing)
+	}
+	existing.ServerURL = NormalizeServerURL(serverURL)
+
+	data, err := json.MarshalIndent(existing, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(cfgPath, data, 0600)
+}
+
+// NormalizeServerURL 规范化 server 地址，支持裸 host:port 自动补 http://。
+func NormalizeServerURL(raw string) string {
+	s := strings.TrimSpace(raw)
+	if s == "" {
+		return ""
+	}
+	if !strings.Contains(s, "://") {
+		s = "http://" + s
+	}
+	u, err := url.Parse(s)
+	if err != nil {
+		return strings.TrimRight(s, "/")
+	}
+	if u.Scheme == "" {
+		u.Scheme = "http"
+	}
+	normalized := u.String()
+	return strings.TrimRight(normalized, "/")
 }

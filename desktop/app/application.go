@@ -159,6 +159,7 @@ func (a *Application) connect() {
 	// 确定待尝试的服务器列表
 	var urlsToTry []string
 	if a.cfg.ServerURL != "" {
+		a.cfg.ServerURL = config.NormalizeServerURL(a.cfg.ServerURL)
 		urlsToTry = append(urlsToTry, a.cfg.ServerURL)
 	}
 
@@ -177,6 +178,7 @@ func (a *Application) connect() {
 
 	// 依次尝试所有地址
 	for _, targetURL := range urlsToTry {
+		targetURL = config.NormalizeServerURL(targetURL)
 		a.cfg.ServerURL = targetURL
 		slog.Info("应用：正在尝试登录服务器", "URL", targetURL)
 
@@ -195,6 +197,7 @@ func (a *Application) connect() {
 		if dErr == nil {
 			slog.Info("应用：局域网发现结果", "候选地址数", len(discovered), "列表", discovered)
 			for _, targetURL := range discovered {
+				targetURL = config.NormalizeServerURL(targetURL)
 				// 跳过已经试过失败的
 				retry := true
 				for _, tried := range urlsToTry {
@@ -225,8 +228,12 @@ func (a *Application) connect() {
 		return
 	}
 
+	successfulURL = config.NormalizeServerURL(successfulURL)
 	slog.Info("应用：服务器连接成功", "最终URL", successfulURL)
 	a.cfg.ServerURL = successfulURL
+	if err := a.cfg.SaveServerURLOnly(successfulURL); err != nil {
+		slog.Warn("应用：保存最近可用服务器地址失败", "错误", err)
+	}
 
 	// 步骤 2: 获取用于加密密钥派生的 user 信息技巧。
 	if a.cfg.E2EEEnabled {
@@ -282,6 +289,10 @@ func (a *Application) connect() {
 
 // login 执行基于 HTTP 表单的 login 并返回 session cookies。
 func (a *Application) login() ([]*http.Cookie, error) {
+	a.cfg.ServerURL = config.NormalizeServerURL(a.cfg.ServerURL)
+	if a.cfg.ServerURL == "" {
+		return nil, fmt.Errorf("empty server URL")
+	}
 	loginURL := a.cfg.ServerURL + "/login"
 
 	form := url.Values{

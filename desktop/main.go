@@ -38,7 +38,7 @@ func main() {
 
 	// 如果提供了 flags，则进行覆盖
 	if *serverURL != "" {
-		cfg.ServerURL = *serverURL
+		cfg.ServerURL = config.NormalizeServerURL(*serverURL)
 	}
 	if *username != "" {
 		cfg.Username = *username

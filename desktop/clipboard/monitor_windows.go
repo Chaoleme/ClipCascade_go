@@ -4,7 +4,6 @@ package clipboard
 
 import (
 	"log/slog"
-	"os"
 	"os/exec"
 	"strings"
 	"syscall"
@@ -76,10 +75,7 @@ func getPlatformFilePaths() ([]string, error) {
 
 		path := windows.UTF16ToString(buf)
 		if path != "" {
-			// 物理校验：只有真实存在的磁盘文件才被视为文件路径。
-			if _, err := os.Stat(path); err == nil {
-				paths = append(paths, path)
-			}
+			paths = append(paths, path)
 		}
 	}
 

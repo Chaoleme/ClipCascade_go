@@ -11,6 +11,7 @@ require (
 	github.com/grandcat/zeroconf v1.0.0
 	github.com/pion/webrtc/v4 v4.2.9
 	golang.design/x/clipboard v0.7.1
+	golang.org/x/sys v0.41.0
 )
 
 require (
@@ -55,8 +56,8 @@ require (
 	golang.org/x/image v0.28.0 // indirect
 	golang.org/x/mobile v0.0.0-20250606033058-a2a15c67f36f // indirect
 	golang.org/x/net v0.50.0 // indirect
-	golang.org/x/sys v0.41.0 // indirect
+	golang.org/x/sync v0.19.0 // indirect
 	golang.org/x/time v0.10.0 // indirect
 )
 
-replace github.com/clipcascade/pkg => ../pkg
+replace github.com/clipcascade/pkg => ../core

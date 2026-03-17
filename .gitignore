@@ -1,21 +1,30 @@
 # Build outputs
 build/
+server/.cache
 
 # Local databases / runtime artifacts
-database/*.db
+database/
 
 # Gradle / Android intermediate outputs
 .gradle-user-home/
-mobile/android/.gradle/
-mobile/android/build/
-mobile/android/app/build/
-mobile/android/app/libs/
-mobile/android/local.properties
+client-android-native-shell/android/.gradle/
+client-android-native-shell/android/build/
+client-android-native-shell/android/app/build/
+client-android-native-shell/android/app/libs/
+client-android-native-shell/android/local.properties
 
 # Fyne / cross-build temporary outputs
-fyne_mobile/fyne-cross/bin/
-fyne_mobile/fyne-cross/dist/
-fyne_mobile/fyne-cross/tmp/
+# fyne-cross hardcodes this directory name, cannot be renamed
+fyne-cross/
+client-mobile/fyne-cross/
+
+# Compiled binaries & packages (outside build/)
+*.exe
+*.apk
+*.aar
+*.jar
+*.so
+*.dylib
 
 # macOS
 .DS_Store

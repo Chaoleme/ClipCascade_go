@@ -1,8 +1,8 @@
 go 1.24.0
 
 use (
-	./desktop
-	./fyne_mobile
-	./pkg
+	./client-desktop
+	./client-mobile
+	./core
 	./server
 )

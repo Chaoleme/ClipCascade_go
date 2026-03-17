@@ -101,7 +101,7 @@ build_server_cross() {
 
 build_desktop() {
     info "正在构建桌面客户端 (本地平台)..."
-    cd "$ROOT_DIR/desktop"
+    cd "$ROOT_DIR/client-desktop"
     # 本地编译使用默认 CGO 设置
     go build -ldflags="$LDFLAGS" -o "$BUILD_DIR/clipcascade-desktop" .
     info "✅ 桌面端构建成功 → $BUILD_DIR/clipcascade-desktop"
@@ -112,7 +112,7 @@ build_desktop_cross() {
     info "正在为所有平台交叉编译桌面端..."
     sanitize_macos_env
     
-    cd "$ROOT_DIR/desktop"
+    cd "$ROOT_DIR/client-desktop"
     mkdir -p "$BUILD_DIR"
     
     # 1. macOS (Darwin) - 原生编译
@@ -141,7 +141,7 @@ build_desktop_cross() {
     info "  → 编译中: linux/amd64 (通过 Docker)"
     if docker_daemon_ready; then
         info "    正在启动 Docker 容器进行 Linux CGO 编译..."
-        docker run --rm -v "$ROOT_DIR:/app" -w /app/desktop golang:1.22-bookworm bash -c "
+        docker run --rm -v "$ROOT_DIR:/app" -w /app/client-desktop golang:1.22-bookworm bash -c "
             apt-get update && apt-get install -y libgtk-3-dev libx11-dev libayatana-appindicator3-dev pkg-config && 
             GOOS=linux GOARCH=amd64 CGO_ENABLED=1 go build -ldflags=\"$LDFLAGS\" -o /app/build/clipcascade-desktop-linux-amd64 .
         " || warn "    ⚠ linux/amd64 编译失败"
@@ -173,7 +173,7 @@ build_desktop_ui() {
     local os=$(go env GOOS)
     local arch=$(go env GOARCH)
     
-    cd "$ROOT_DIR/fyne_mobile"
+    cd "$ROOT_DIR/client-mobile"
     if ! go build -ldflags="-s -w" -o "$BUILD_DIR/clipcascade-ui-desktop-$os-$arch" .; then
         warn "⚠ 桌面 UI 构建失败，已跳过（可稍后单独执行 ./scripts/build.sh desktop-ui）"
         cd "$ROOT_DIR"
@@ -204,7 +204,7 @@ build_desktop_ui_cross() {
     fi
     mkdir -p "$BUILD_DIR"
     
-    cd "$ROOT_DIR/fyne_mobile"
+    cd "$ROOT_DIR/client-mobile"
     
     info "    → 编译中: windows/amd64 (UI 版)"
     fyne-cross windows -arch=amd64 -app-id com.clipcascade.desktopui || warn "⚠ Windows UI 构建失败 (请检查 Docker)"
@@ -221,21 +221,11 @@ build_desktop_ui_cross() {
     cd "$ROOT_DIR"
 }
 
-build_mobile_android() {
-    info "正在构建 Android 端 (.apk)..."
-    check_fyne
-    mkdir -p "$BUILD_DIR"
-    cd "$ROOT_DIR/fyne_mobile"
-    fyne package -os android/arm64 -app-id com.clipcascade.mobile -tags netgo -release
-    mv fynemobile.apk "$BUILD_DIR/clipcascade-mobile.apk" 2>/dev/null || warn "APK 文件生成但未能移动到 build 目录"
-    info "✅ Android 构建成功 → $BUILD_DIR/clipcascade-mobile.apk"
-    cd "$ROOT_DIR"
-}
 
 build_mobile_android_native() {
     info "正在构建 Android 原生保活版 (.apk, 前台服务 + 无障碍)..."
     cd "$ROOT_DIR"
-    if ! bash "$ROOT_DIR/scripts/build_android.sh"; then
+    if ! bash "$ROOT_DIR/build-scripts/build_android.sh"; then
         warn "⚠ Android 原生保活版构建失败，请检查 gomobile/Gradle/Android SDK 环境"
         return 1
     fi
@@ -250,7 +240,7 @@ build_mobile_ios() {
     fi
     check_fyne
     mkdir -p "$BUILD_DIR"
-    cd "$ROOT_DIR/fyne_mobile"
+    cd "$ROOT_DIR/client-mobile"
     fyne package -os ios -app-id com.clipcascade.mobile -release || warn "⚠ iOS 构建失败: 缺少 Apple 开发者证书 (如需免签，请参阅 README 手动通过 Xcode 编译)"
     mv ClipCascade.app "$BUILD_DIR/clipcascade-mobile.app" 2>/dev/null || true
     if [ -d "$BUILD_DIR/clipcascade-mobile.app" ]; then
@@ -269,7 +259,7 @@ build_docker() {
 
 tidy() {
     info "清理模块依赖..."
-    for d in pkg server desktop; do
+    for d in core server client-desktop; do
         if [ -d "$ROOT_DIR/$d" ]; then
             cd "$ROOT_DIR/$d" && go mod tidy
         fi
@@ -284,17 +274,13 @@ clean() {
 
 show_help() {
     echo "ClipCascade 全能构建脚本 (无 CGO 依赖重制版 & Fyne UI 合并版)"
-    echo "用法: $0 {server|server-cross|desktop|desktop-ui|desktop-ui-cross|cross|mobile-android|mobile-android-native|mobile-ios|docker|all|tidy|clean}"
+    echo "用法: $0 {server|server-cross|desktop|desktop-ui|desktop-ui-cross|cross|mobile-android-native|docker|all|tidy|clean}"
     echo
     echo "命令:"
     echo "  desktop          构建当前系统原生隐形式 Desktop 托盘端 (无界面纯后台)"
     echo "  desktop-ui       构建当前系统的 Fyne 图形化 Desktop 桌面端面板 (可视化操作)"
     echo "  desktop-ui-cross 跨平台交叉编译 Mac, Windows, Linux 的图形化桌面端面板 (依赖 Docker)"
-    echo "  cross            交叉编译 Mac, Windows, Linux 桌面(无界面)端和全平台 Server"
-    echo "  mobile-android   使用 Fyne 构建 Android (.apk) 安装包"
-    echo "  mobile-android-native 使用 gomobile + Kotlin 构建 Android 原生保活版 (.apk)"
-    echo "  mobile-ios       使用 Fyne 构建 iOS (.app) (仅限 Mac)"
-    echo "  server           构建本地 Server 二进制文件"
+    echo "  cross            交叉编译 Mac, Windows, Linux 桌面(无界面)端和全平台 Server"    echo "  mobile-android-native 使用 gomobile + Kotlin 构建 Android 原生保活版 (.apk)"    echo "  server           构建本地 Server 二进制文件"
     echo "  server-cross     交叉编译所有平台 Server 架构"
     echo "  docker           将 Server 构建为 Docker 镜像"
     echo "  all              一键满配全平台编译: 隐形式桌面端 + UI式桌面端 + Android + iOS + Server"
@@ -322,15 +308,11 @@ for target in "$@"; do
         desktop-ui)       build_desktop_ui ;;
         desktop-ui-cross) build_desktop_ui_cross ;;
         cross)            build_server_cross; build_desktop_cross; build_desktop_ui_cross || warn "cross 某些目标构建失败，已继续" ;;
-        mobile-android)   build_mobile_android ;;
         mobile-android-native) build_mobile_android_native ;;
-        mobile-ios)       build_mobile_ios ;;
         docker)           build_docker ;;
         all)              build_server_cross || warn "server-cross 构建失败";
                           build_desktop_cross || warn "desktop-cross 构建失败";
                           build_desktop_ui || warn "desktop-ui 构建失败";
-                          build_mobile_android || warn "mobile-android 构建失败";
-                          build_mobile_ios || warn "mobile-ios 构建失败";
                           build_desktop_ui_cross || warn "desktop-ui-cross 构建失败" ;;
         tidy)           tidy ;;
         clean)          clean ;;

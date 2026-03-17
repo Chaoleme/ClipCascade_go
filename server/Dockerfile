@@ -3,10 +3,8 @@ FROM golang:1.25-alpine AS builder
 WORKDIR /build
 
 # Copy go.work and all module files
-COPY go.work .
-COPY pkg/ pkg/
-COPY desktop/ desktop/
-COPY fyne_mobile/ fyne_mobile/
+COPY go.work go.work.sum ./
+COPY core/ core/
 COPY server/ server/
 
 # Build server with static linking

@@ -6,6 +6,7 @@ import (
 	"embed"
 	"encoding/hex"
 	"errors"
+	"flag"
 	"fmt"
 	"log"
 	"math"
@@ -186,6 +187,11 @@ func main() {
 		return filepath.Dir(exe)
 	}()
 
+	var portFlag int
+	flag.IntVar(&portFlag, "p", 0, "port to listen on")
+	flag.IntVar(&portFlag, "port", 0, "port to listen on")
+	flag.Parse()
+
 	dbPath := strings.TrimSpace(os.Getenv("WEBCLIP_DB_PATH"))
 	if dbPath == "" {
 		dbPath = filepath.Join(exeDir, "data.db")
@@ -195,7 +201,9 @@ func main() {
 		uploadDir = filepath.Join(exeDir, "uploads")
 	}
 	startPort := 8090
-	if p := strings.TrimSpace(os.Getenv("WEBCLIP_PORT")); p != "" {
+	if portFlag > 0 {
+		startPort = portFlag
+	} else if p := strings.TrimSpace(os.Getenv("WEBCLIP_PORT")); p != "" {
 		if n, err := strconv.Atoi(p); err == nil {
 			startPort = n
 		}

@@ -108,3 +108,19 @@ func setPlatformFilePaths(paths []string) error {
 	}
 	return err
 }
+
+func getPlatformImage() ([]byte, error) {
+	return nil, nil
+}
+
+func getPlatformText() ([]byte, error) {
+	return nil, nil
+}
+
+func setPlatformText(text string) error {
+	return nil
+}
+
+func setPlatformImage(data []byte) error {
+	return nil
+}

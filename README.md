@@ -1,5 +1,10 @@
 # ClipCascade Go
 
+# ClipCascade Go
+
+[![English](https://img.shields.io/badge/Language-English-blue?style=for-the-badge)](README_en.md)
+[![简体中文](https://img.shields.io/badge/Language-简体中文-red?style=for-the-badge)](README.md)
+
 一个面向多设备协作的跨平台剪贴板同步工具。
 目标不是"再造一个聊天工具"，而是让跨设备复制粘贴尽量接近本机体验。
 
@@ -344,3 +349,7 @@ open -a OrbStack
 
 - `应用：准备发送剪贴板更新 类型=file_eager`
 - `剪贴板：已接收并写入文件到临时目录`
+
+## 开源协议
+
+本项目基于 [Apache License 2.0](LICENSE) 协议开源。

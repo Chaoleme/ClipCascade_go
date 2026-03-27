@@ -180,39 +180,45 @@ func (m *Manager) handleSystemChange() {
 
 	if runtime.GOOS == "darwin" {
 		if data, _ := getPlatformImage(); len(data) > 0 {
-			m.handleChange(base64.StdEncoding.EncodeToString(data), constants.TypeImage, "")
-			return
+			if m.handleChange(base64.StdEncoding.EncodeToString(data), constants.TypeImage, "") {
+				return
+			}
 		}
 
 		if data, _ := getPlatformText(); len(data) > 0 {
-			m.handleChange(string(data), constants.TypeText, "")
-			return
+			if m.handleChange(string(data), constants.TypeText, "") {
+				return
+			}
 		}
 		return
 	}
 
 	if runtime.GOOS == "windows" {
 		if data, _ := getPlatformImage(); len(data) > 0 {
-			m.handleChange(base64.StdEncoding.EncodeToString(data), constants.TypeImage, "")
-			return
+			if m.handleChange(base64.StdEncoding.EncodeToString(data), constants.TypeImage, "") {
+				return
+			}
 		}
 
 		if data, _ := getPlatformText(); len(data) > 0 {
-			m.handleChange(string(data), constants.TypeText, "")
-			return
+			if m.handleChange(string(data), constants.TypeText, "") {
+				return
+			}
 		}
 	}
 
 	// 优先级 2: 图像
 	if data := clipboard.Read(clipboard.FmtImage); len(data) > 0 {
-		m.handleChange(base64.StdEncoding.EncodeToString(data), constants.TypeImage, "")
-		return
+		if m.handleChange(base64.StdEncoding.EncodeToString(data), constants.TypeImage, "") {
+			return
+		}
 	}
 
 	// 优先级 3: 文本 (兜底)
 	if data := clipboard.Read(clipboard.FmtText); len(data) > 0 {
-		m.handleChange(string(data), constants.TypeText, "")
-		return
+		if m.handleChange(string(data), constants.TypeText, "") {
+			return
+		}
 	}
 }
 
@@ -223,28 +229,28 @@ func (m *Manager) handleFileChange() bool {
 		// 单文件且大小可控时，使用 eager 直传保证跨端可粘贴。
 		if len(paths) == 1 {
 			if payload, name, ok := buildFileEagerPayload(paths[0]); ok {
-				m.handleChange(payload, constants.TypeFileEager, name)
-				return true
+				return m.handleChange(payload, constants.TypeFileEager, name)
 			}
 		}
 		// 其余情况走懒加载占位符（多文件/超大文件）。
 		payload := buildFileStubPayload(paths)
 		meta := buildFileStubMeta(paths)
-		m.handleChange(payload, constants.TypeFileStub, meta)
-		return true
+		return m.handleChange(payload, constants.TypeFileStub, meta)
 	}
 	return false
 }
 
 // handleChange 处理剪贴板更改事件。
-func (m *Manager) handleChange(payload string, payloadType string, filename string) {
+func (m *Manager) handleChange(payload string, payloadType string, filename string) bool {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	// 统一使用 xxHash 检查内容是否确实发生实质性更改（防止自身 Paste 死循环）
 	hash := contentHash(payload, payloadType)
+	slog.Debug("剪贴板：handleChange hash 检查", "类型", payloadType, "新hash", hash, "旧hash", m.lastHash, "是否相同", hash == m.lastHash)
 	if hash == m.lastHash {
-		return
+		slog.Debug("剪贴板：hash 相同，跳过", "类型", payloadType)
+		return false
 	}
 	m.lastHash = hash
 
@@ -265,12 +271,15 @@ func (m *Manager) handleChange(payload string, payloadType string, filename stri
 	if m.onCopy != nil {
 		m.onCopy(payload, payloadType, filename)
 	}
+	return true
 }
 
 // Paste sets the clipboard content. Updates lastHash to securely prevent self-trigger loop echoing.
 func (m *Manager) Paste(payload string, payloadType string, filename string) {
 	m.mu.Lock()
-	m.lastHash = contentHash(payload, payloadType)
+	newHash := contentHash(payload, payloadType)
+	slog.Debug("剪贴板：Paste 设置 lastHash", "类型", payloadType, "hash", newHash)
+	m.lastHash = newHash
 	m.mu.Unlock()
 
 	switch payloadType {
@@ -293,7 +302,7 @@ func (m *Manager) Paste(payload string, payloadType string, filename string) {
 			slog.Warn("剪贴板：无法解码图像", "错误", err)
 			return
 		}
-		if runtime.GOOS == "darwin" {
+		if runtime.GOOS == "darwin" || runtime.GOOS == "windows" {
 			if err := setPlatformImage(data); err != nil {
 				slog.Warn("剪贴板：无法写入图像到系统剪贴板", "错误", err)
 				return

@@ -349,6 +349,11 @@ Ensure both ends are using the latest desktop binaries and check logs for:
 - `App: Preparing to send clipboard update Type=file_eager`
 - `Clipboard: Received and wrote file to temporary directory`
 
+## 社区
+
+[LINUX DO](https://linux.do/)
+
+
 ## License
 
 This project is licensed under the [Apache License 2.0](LICENSE).

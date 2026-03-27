@@ -350,6 +350,11 @@ open -a OrbStack
 - `应用：准备发送剪贴板更新 类型=file_eager`
 - `剪贴板：已接收并写入文件到临时目录`
 
+
+## 社区
+
+[LINUX DO](https://linux.do/)
+
 ## 开源协议
 
 本项目基于 [Apache License 2.0](LICENSE) 协议开源。

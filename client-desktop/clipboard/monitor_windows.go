@@ -10,6 +10,7 @@ import (
 	"image/png"
 	"log/slog"
 	"os/exec"
+	"runtime"
 	"strings"
 	"syscall"
 	"unsafe"
@@ -23,11 +24,17 @@ var (
 	shell32                        = syscall.NewLazyDLL("shell32.dll")
 	procOpenClipboard              = user32.NewProc("OpenClipboard")
 	procCloseClipboard             = user32.NewProc("CloseClipboard")
+	procEmptyClipboard             = user32.NewProc("EmptyClipboard")
 	procGetClipboardData           = user32.NewProc("GetClipboardData")
+	procSetClipboardData           = user32.NewProc("SetClipboardData")
 	procIsClipboardFormatAvailable = user32.NewProc("IsClipboardFormatAvailable")
+	procRegisterClipboardFormatA   = user32.NewProc("RegisterClipboardFormatA")
+	procGlobalAlloc                = kernel32.NewProc("GlobalAlloc")
 	procGlobalLock                 = kernel32.NewProc("GlobalLock")
 	procGlobalUnlock               = kernel32.NewProc("GlobalUnlock")
+	procGlobalFree                 = kernel32.NewProc("GlobalFree")
 	procGlobalSize                 = kernel32.NewProc("GlobalSize")
+	procRtlMoveMemory              = kernel32.NewProc("RtlMoveMemory")
 	procGetClipboardSequenceNumber = user32.NewProc("GetClipboardSequenceNumber")
 	procDragQueryFileW             = shell32.NewProc("DragQueryFileW")
 )
@@ -37,6 +44,8 @@ const (
 	CF_DIB         = 8
 	CF_DIBV5       = 17
 	CF_HDROP       = 15
+
+	gmemMoveable = 0x0002
 
 	biRGB       = 0
 	biBitfields = 3
@@ -138,6 +147,17 @@ func setPlatformFilePaths(paths []string) error {
 }
 
 func getPlatformImage() ([]byte, error) {
+	if pngFormat := getRegisteredClipboardFormat("PNG"); pngFormat != 0 {
+		data, err := readClipboardBytes(pngFormat)
+		if err == nil && len(data) > 0 {
+			if _, err := png.Decode(bytes.NewReader(data)); err == nil {
+				slog.Debug("剪贴板：Windows 原生读取 PNG 注册格式")
+				return data, nil
+			}
+			slog.Debug("剪贴板：Windows PNG 注册格式不是有效 PNG，继续尝试 DIB", "错误", err)
+		}
+	}
+
 	data, err := readClipboardBytes(CF_DIBV5)
 	if err != nil || len(data) == 0 {
 		data, err = readClipboardBytes(CF_DIB)
@@ -180,6 +200,38 @@ func setPlatformText(text string) error {
 }
 
 func setPlatformImage(data []byte) error {
+	if len(data) == 0 {
+		return nil
+	}
+
+	dib, err := encodePNGToDIB(data)
+	if err != nil {
+		return err
+	}
+
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+
+	if err := openClipboardForWrite(); err != nil {
+		return err
+	}
+	defer procCloseClipboard.Call()
+
+	r, _, err := procEmptyClipboard.Call()
+	if r == 0 {
+		return err
+	}
+
+	if err := setClipboardDataBytes(CF_DIBV5, dib); err != nil {
+		return err
+	}
+
+	if pngFormat := getRegisteredClipboardFormat("PNG"); pngFormat != 0 {
+		if err := setClipboardDataBytes(pngFormat, data); err != nil {
+			slog.Warn("剪贴板：Windows 写入 PNG 注册格式失败", "错误", err)
+		}
+	}
+
 	return nil
 }
 
@@ -215,6 +267,57 @@ func readClipboardBytes(format uintptr) ([]byte, error) {
 	out := make([]byte, len(buf))
 	copy(out, buf)
 	return out, nil
+}
+
+func openClipboardForWrite() error {
+	for i := 0; i < 20; i++ {
+		r, _, err := procOpenClipboard.Call(0)
+		if r != 0 {
+			return nil
+		}
+		if err == windows.ERROR_ACCESS_DENIED {
+			windows.SleepEx(10, false)
+			continue
+		}
+	}
+	_, _, err := procOpenClipboard.Call(0)
+	return err
+}
+
+func getRegisteredClipboardFormat(name string) uintptr {
+	ptr, err := syscall.BytePtrFromString(name)
+	if err != nil {
+		return 0
+	}
+	r, _, _ := procRegisterClipboardFormatA.Call(uintptr(unsafe.Pointer(ptr)))
+	return r
+}
+
+func setClipboardDataBytes(format uintptr, data []byte) error {
+	if len(data) == 0 {
+		return nil
+	}
+
+	hMem, _, err := procGlobalAlloc.Call(gmemMoveable, uintptr(len(data)))
+	if hMem == 0 {
+		return err
+	}
+
+	ptr, _, err := procGlobalLock.Call(hMem)
+	if ptr == 0 {
+		procGlobalFree.Call(hMem)
+		return err
+	}
+
+	procRtlMoveMemory.Call(ptr, uintptr(unsafe.Pointer(&data[0])), uintptr(len(data)))
+	procGlobalUnlock.Call(hMem)
+
+	r, _, err := procSetClipboardData.Call(format, hMem)
+	if r == 0 {
+		procGlobalFree.Call(hMem)
+		return err
+	}
+	return nil
 }
 
 func decodeDIB(data []byte) (*image.NRGBA, error) {
@@ -291,4 +394,45 @@ func decodeDIB(data []byte) (*image.NRGBA, error) {
 	}
 
 	return img, nil
+}
+
+func encodePNGToDIB(data []byte) ([]byte, error) {
+	img, err := png.Decode(bytes.NewReader(data))
+	if err != nil {
+		return nil, err
+	}
+
+	width := img.Bounds().Dx()
+	height := img.Bounds().Dy()
+	headerSize := 124
+	out := make([]byte, headerSize+width*height*4)
+
+	binary.LittleEndian.PutUint32(out[0:4], uint32(headerSize))
+	binary.LittleEndian.PutUint32(out[4:8], uint32(width))
+	binary.LittleEndian.PutUint32(out[8:12], uint32(height))
+	binary.LittleEndian.PutUint16(out[12:14], 1)
+	binary.LittleEndian.PutUint16(out[14:16], 32)
+	binary.LittleEndian.PutUint32(out[16:20], biRGB)
+	binary.LittleEndian.PutUint32(out[20:24], uint32(width*height*4))
+	binary.LittleEndian.PutUint32(out[40:44], 0x00ff0000)
+	binary.LittleEndian.PutUint32(out[44:48], 0x0000ff00)
+	binary.LittleEndian.PutUint32(out[48:52], 0x000000ff)
+	binary.LittleEndian.PutUint32(out[52:56], 0xff000000)
+	binary.LittleEndian.PutUint32(out[56:60], 0x73524742) // sRGB
+	binary.LittleEndian.PutUint32(out[108:112], 4)        // LCS_GM_IMAGES
+
+	offset := headerSize
+	for y := 0; y < height; y++ {
+		srcY := height - 1 - y
+		for x := 0; x < width; x++ {
+			r, g, b, a := img.At(x, srcY).RGBA()
+			i := offset + (y*width+x)*4
+			out[i+0] = uint8(b >> 8)
+			out[i+1] = uint8(g >> 8)
+			out[i+2] = uint8(r >> 8)
+			out[i+3] = uint8(a >> 8)
+		}
+	}
+
+	return out, nil
 }

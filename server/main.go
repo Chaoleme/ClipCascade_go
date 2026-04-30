@@ -131,7 +131,7 @@ func main() {
 
 	authHandler := handler.NewAuthHandler(db, cfg, bfa)
 	statusHandler := handler.NewStatusHandler(cfg)
-	fileTransferHandler := handler.NewFileTransferHandler(db, cfg)
+	fileTransferHandler := handler.NewFileTransferHandler(db, cfg, wsHub)
 	fileRelayStop := make(chan struct{})
 	if cfg.FileRelayEnabled {
 		go fileTransferHandler.RunCleanupLoop(10*time.Minute, fileRelayStop)
@@ -202,6 +202,14 @@ func main() {
 	app.Get("/api/ws-stats", func(c *fiber.Ctx) error {
 		return c.JSON(wsHub.Stats())
 	})
+	app.Get("/api/files/deferred", fileTransferHandler.ListDeferred)
+	app.Get("/api/files/deferred/:deferredID", fileTransferHandler.GetDeferred)
+	app.Delete("/api/files/deferred/:deferredID", fileTransferHandler.DeleteDeferred)
+	app.Post("/api/files/deferred/register", fileTransferHandler.RegisterDeferred)
+	app.Post("/api/files/deferred/:deferredID/request", fileTransferHandler.RequestDeferred)
+	app.Post("/api/files/deferred/:deferredID/progress", fileTransferHandler.ProgressDeferred)
+	app.Post("/api/files/deferred/:deferredID/complete", fileTransferHandler.CompleteDeferred)
+	app.Post("/api/files/deferred/:deferredID/fail", fileTransferHandler.FailDeferred)
 	app.Post("/api/files/upload", fileTransferHandler.Upload)
 	app.Get("/api/files/:relayID", fileTransferHandler.Download)
 	app.Get("/api/user-info", func(c *fiber.Ctx) error {

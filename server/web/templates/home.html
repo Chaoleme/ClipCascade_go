@@ -16,10 +16,8 @@
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
             min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
             color: #e0e0e0;
+            padding: 40px 20px;
         }
 
         .container {
@@ -27,54 +25,64 @@
             backdrop-filter: blur(20px);
             border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 16px;
-            padding: 40px;
+            padding: 32px;
             width: 100%;
-            max-width: 500px;
+            max-width: 1100px;
+            margin: 0 auto;
         }
 
         h1 {
-            text-align: center;
-            margin-bottom: 8px;
             font-size: 28px;
+            margin-bottom: 8px;
         }
 
         .subtitle {
-            text-align: center;
             color: #999;
             margin-bottom: 24px;
         }
 
-        .info-box {
-            background: rgba(108, 99, 255, 0.1);
-            border: 1px solid rgba(108, 99, 255, 0.2);
-            border-radius: 8px;
-            padding: 16px;
-            margin-bottom: 16px;
+        .panel-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
         }
 
-        .info-box h3 {
+        .info-box,
+        .section,
+        .stat {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+        }
+
+        .info-box {
+            padding: 16px;
+        }
+
+        .info-box h3,
+        .section h3 {
             font-size: 14px;
             color: #6c63ff;
             margin-bottom: 8px;
         }
 
-        .info-box p {
+        .info-box p,
+        .hint {
             font-size: 13px;
-            color: #ccc;
-            line-height: 1.5;
+            color: #cfcfe6;
+            line-height: 1.55;
         }
 
         .stats {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: repeat(4, 1fr);
             gap: 12px;
             margin-bottom: 24px;
         }
 
         .stat {
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 8px;
-            padding: 12px;
+            padding: 14px;
             text-align: center;
         }
 
@@ -90,20 +98,113 @@
             margin-top: 4px;
         }
 
+        .section {
+            padding: 18px;
+            margin-bottom: 24px;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .table th,
+        .table td {
+            padding: 12px 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            text-align: left;
+            font-size: 13px;
+            vertical-align: top;
+        }
+
+        .table th {
+            font-size: 11px;
+            color: #999;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+
+        .table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 8px;
+            border-radius: 999px;
+            font-size: 12px;
+            line-height: 1;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            background: rgba(255, 255, 255, 0.06);
+        }
+
+        .badge.pending {
+            color: #ffd166;
+        }
+
+        .badge.requested {
+            color: #7bdff2;
+        }
+
+        .badge.ready {
+            color: #80ed99;
+        }
+
+        .badge.uploading {
+            color: #a0c4ff;
+        }
+
+        .badge.failed {
+            color: #ff6b6b;
+        }
+
+        .progress {
+            width: 100%;
+            height: 8px;
+            margin-top: 8px;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 999px;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #6c63ff, #7bdff2);
+            border-radius: 999px;
+            transition: width .25s ease;
+        }
+
         .btn {
-            display: inline-block;
-            padding: 10px 20px;
-            background: rgba(255, 255, 255, 0.1);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 9px 14px;
+            background: rgba(255, 255, 255, 0.08);
             border: 1px solid rgba(255, 255, 255, 0.15);
             border-radius: 8px;
             color: #e0e0e0;
             text-decoration: none;
-            font-size: 14px;
-            transition: background .2s;
+            font-size: 13px;
+            cursor: pointer;
+            transition: background .2s ease;
         }
 
         .btn:hover {
-            background: rgba(255, 255, 255, 0.15);
+            background: rgba(255, 255, 255, 0.14);
+        }
+
+        .btn[disabled] {
+            opacity: .6;
+            cursor: wait;
         }
 
         .btn-danger {
@@ -111,10 +212,45 @@
             color: #ff6b6b;
         }
 
-        .actions {
+        .row-actions {
             display: flex;
-            gap: 12px;
-            justify-content: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .muted {
+            color: #999;
+        }
+
+        .empty {
+            padding: 18px 12px;
+            text-align: center;
+            color: #999;
+            font-size: 13px;
+        }
+
+        @media (max-width: 860px) {
+            .stats {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .table,
+            .table thead,
+            .table tbody,
+            .table tr,
+            .table th,
+            .table td {
+                display: block;
+                width: 100%;
+            }
+
+            .table thead {
+                display: none;
+            }
+
+            .table td {
+                padding: 10px 0;
+            }
         }
     </style>
 </head>
@@ -124,10 +260,16 @@
         <h1>🔗 ClipCascade</h1>
         <p class="subtitle">Welcome, <strong>{{.username}}</strong></p>
 
-        <div class="info-box">
-            <h3>📡 Server Info</h3>
-            <p>Mode: <strong>{{.mode}}</strong> | Port: <strong>{{.port}}</strong></p>
-            <p>Max message size: <strong>{{.max_size_mib}} MiB</strong></p>
+        <div class="panel-grid">
+            <div class="info-box">
+                <h3>📡 Server Info</h3>
+                <p>Mode: <strong>{{.mode}}</strong> | Port: <strong>{{.port}}</strong></p>
+                <p>Max message size: <strong>{{.max_size_mib}} MiB</strong></p>
+            </div>
+            <div class="info-box">
+                <h3>📦 File Tiers</h3>
+                <p><strong>&lt;= 8 MiB</strong>: clipboard direct. <strong>8-25 MiB</strong>: HTTP auto relay. <strong>25 MiB-2 GiB</strong>: listed here for on-demand web downloads. <strong>&gt; 2 GiB</strong>: not supported.</p>
+            </div>
         </div>
 
         <div class="stats" id="stats">
@@ -149,22 +291,172 @@
             </div>
         </div>
 
-        <div class="actions">
+        <div class="section">
+            <div class="section-header">
+                <div>
+                    <h3>🗂️ Deferred Large Files</h3>
+                    <p class="hint">These are large files registered by your desktop client. Click request/download when you actually need the bytes.</p>
+                </div>
+                <button class="btn" onclick="loadDeferredFiles()">Refresh</button>
+            </div>
+            <div id="deferred-wrap">
+                <div class="empty">Loading deferred files...</div>
+            </div>
+        </div>
+
+        <div class="row-actions">
             {{if .is_admin}}<a href="/advance" class="btn">⚙️ Admin</a>{{end}}
             <a href="/logout" class="btn btn-danger">🚪 Logout</a>
         </div>
     </div>
 
     <script>
-        async function refreshStats() {
+        const watchedDeferredDownloads = new Set();
+        let deferredPollTimer = null;
+        let lastDeferredItems = [];
+
+        function escapeHTML(value) {
+            return String(value || '').replace(/[&<>"']/g, ch => ({
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;'
+            }[ch]));
+        }
+
+        function formatDate(value) {
+            if (!value) return '-';
+            const date = new Date(value);
+            if (Number.isNaN(date.getTime())) return '-';
+            return date.toLocaleString();
+        }
+
+        function statusBadge(status) {
+            const safe = escapeHTML(status || 'pending');
+            return `<span class="badge ${safe}">${safe}</span>`;
+        }
+
+        function renderDeferredRows(items) {
+            if (!items.length) {
+                document.getElementById('deferred-wrap').innerHTML = '<div class="empty">No deferred large files yet.</div>';
+                return;
+            }
+
+            const rows = items.map(item => {
+                let action = '';
+                const safeDeferredID = escapeHTML(item.deferred_id || '');
+                const safeFileName = escapeHTML(item.file_name || '');
+                if (item.download_url) {
+                    action = `<a class="btn" href="${item.download_url}">Download</a>`;
+                } else if (item.status === 'requested' || item.status === 'uploading') {
+                    const label = item.status === 'uploading'
+                        ? `Uploading ${item.upload_percent || 0}%`
+                        : 'Waiting for source...';
+                    action = `<button class="btn" disabled>${label}</button>`;
+                } else {
+                    const label = item.status === 'failed' ? 'Retry request' : 'Request download';
+                    action = `<button class="btn" id="request-${item.deferred_id}" onclick="requestDeferred('${item.deferred_id}')">${label}</button>`;
+                }
+                action += `<button class="btn btn-danger" data-deferred-id="${safeDeferredID}" data-file-name="${safeFileName}" onclick="deleteDeferred(this.dataset.deferredId, this.dataset.fileName)">Delete</button>`;
+                const errorLine = item.last_error ? `<div style="margin-top:6px;color:#ff9f9f">${escapeHTML(item.last_error)}</div>` : '';
+                const detailLine = item.status_detail ? `<div class="muted" style="margin-top:6px">${escapeHTML(item.status_detail)}</div>` : '';
+                const progressLine = item.status === 'uploading'
+                    ? `<div class="progress"><div class="progress-bar" style="width:${Math.max(0, Math.min(100, item.upload_percent || 0))}%"></div></div>`
+                    : '';
+                return `
+                    <tr>
+                        <td>
+                            <div><strong>${escapeHTML(item.file_name)}</strong></div>
+                            <div class="muted">${escapeHTML(item.deferred_id)}</div>
+                            ${detailLine}
+                            ${progressLine}
+                            ${errorLine}
+                        </td>
+                        <td>${escapeHTML(item.file_size_human)}</td>
+                        <td>${statusBadge(item.status)}</td>
+                        <td>
+                            <div>${formatDate(item.created_at)}</div>
+                            ${item.requested_at ? `<div class="muted">Requested ${formatDate(item.requested_at)}</div>` : ''}
+                            ${item.upload_updated ? `<div class="muted">Updated ${formatDate(item.upload_updated)}</div>` : ''}
+                            ${item.upload_speed_human ? `<div class="muted">Speed ${escapeHTML(item.upload_speed_human)}</div>` : ''}
+                            <div class="muted">Expires ${formatDate(item.expires_at)}</div>
+                        </td>
+                        <td>
+                            <div class="row-actions">${action}</div>
+                        </td>
+                    </tr>`;
+            }).join('');
+
+            document.getElementById('deferred-wrap').innerHTML = `
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>File</th>
+                            <th>Size</th>
+                            <th>Status</th>
+                            <th>Timeline</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rows}</tbody>
+                </table>`;
+        }
+
+        function clearDeferredPolling() {
+            if (deferredPollTimer !== null) {
+                clearTimeout(deferredPollTimer);
+                deferredPollTimer = null;
+            }
+        }
+
+        function scheduleDeferredPolling(delay = 2000) {
+            if (document.hidden) {
+                clearDeferredPolling();
+                return;
+            }
+            clearDeferredPolling();
+            deferredPollTimer = window.setTimeout(() => {
+                deferredPollTimer = null;
+                loadDeferredFiles();
+            }, delay);
+        }
+
+        function hasActiveDeferredWork(items) {
+            return items.some(item => item.status === 'requested' || item.status === 'uploading');
+        }
+
+        function handleDeferredWatchTransitions(items) {
+            const visibleDeferredIDs = new Set(items.map(item => item.deferred_id));
+            for (const item of items) {
+                if (!watchedDeferredDownloads.has(item.deferred_id)) {
+                    continue;
+                }
+                if (item.download_url) {
+                    watchedDeferredDownloads.delete(item.deferred_id);
+                    clearDeferredPolling();
+                    window.location.href = item.download_url;
+                    return true;
+                }
+                if (item.status === 'failed' || (item.status === 'pending' && item.last_error)) {
+                    watchedDeferredDownloads.delete(item.deferred_id);
+                    alert(item.status_detail || item.last_error || 'Request failed');
+                    return false;
+                }
+            }
+            for (const watchedID of Array.from(watchedDeferredDownloads)) {
+                if (!visibleDeferredIDs.has(watchedID)) {
+                    watchedDeferredDownloads.delete(watchedID);
+                    alert('This deferred file is no longer available. It may have expired or been removed.');
+                }
+            }
+            return false;
+        }
+
+        async function loadStats() {
             try {
                 const res = await fetch('/api/ws-stats', { credentials: 'same-origin' });
-                if (!res.ok || res.redirected) {
-                    console.warn('ws-stats: auth redirect or error', res.status);
-                    return;
-                }
-                const ct = res.headers.get('content-type') || '';
-                if (!ct.includes('application/json')) return;
+                if (!res.ok || res.redirected) return;
                 const data = await res.json();
                 document.getElementById('active').textContent = data.active_connections || 0;
                 document.getElementById('total').textContent = data.total_connections || 0;
@@ -174,8 +466,101 @@
                 console.error('ws-stats error:', e);
             }
         }
-        refreshStats();
-        setInterval(refreshStats, 3000);
+
+        async function loadDeferredFiles() {
+            try {
+                const res = await fetch('/api/files/deferred', { credentials: 'same-origin' });
+                if (!res.ok || res.redirected) {
+                    clearDeferredPolling();
+                    document.getElementById('deferred-wrap').innerHTML = '<div class="empty">Failed to load deferred files.</div>';
+                    return;
+                }
+                const data = await res.json();
+                const items = Array.isArray(data) ? data : [];
+                lastDeferredItems = items;
+                renderDeferredRows(items);
+                const redirectedToDownload = handleDeferredWatchTransitions(items);
+                if (redirectedToDownload) {
+                    return;
+                }
+                if (hasActiveDeferredWork(items) || watchedDeferredDownloads.size > 0) {
+                    scheduleDeferredPolling();
+                    return;
+                }
+                clearDeferredPolling();
+            } catch (e) {
+                console.error('deferred-files error:', e);
+                clearDeferredPolling();
+                document.getElementById('deferred-wrap').innerHTML = '<div class="empty">Failed to load deferred files.</div>';
+            }
+        }
+
+        async function requestDeferred(deferredID) {
+            const btn = document.getElementById(`request-${deferredID}`);
+            if (btn) {
+                btn.disabled = true;
+                btn.textContent = 'Requesting...';
+            }
+            try {
+                const res = await fetch(`/api/files/deferred/${deferredID}/request`, {
+                    method: 'POST',
+                    credentials: 'same-origin'
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                    throw new Error(data.error || 'request failed');
+                }
+                const item = data.item || data;
+                if ((data.active_clients || 0) === 0) {
+                    throw new Error(item.status_detail || item.last_error || 'No online source desktop client is available');
+                }
+                if (item.download_url) {
+                    window.location.href = item.download_url;
+                    return;
+                }
+                watchedDeferredDownloads.add(deferredID);
+                await loadDeferredFiles();
+            } catch (e) {
+                console.error('request deferred failed:', e);
+                alert(e.message || 'Request failed');
+                await loadDeferredFiles();
+            }
+        }
+
+        async function deleteDeferred(deferredID, fileName) {
+            if (!confirm(`Delete "${fileName}" from the server list? Any uploaded relay copy on the server will also be removed.`)) {
+                return;
+            }
+            watchedDeferredDownloads.delete(deferredID);
+            try {
+                const res = await fetch(`/api/files/deferred/${deferredID}`, {
+                    method: 'DELETE',
+                    credentials: 'same-origin'
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                    throw new Error(data.error || 'delete failed');
+                }
+                await loadDeferredFiles();
+            } catch (e) {
+                console.error('delete deferred failed:', e);
+                alert(e.message || 'Delete failed');
+                await loadDeferredFiles();
+            }
+        }
+
+        loadStats();
+        loadDeferredFiles();
+        setInterval(loadStats, 3000);
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                clearDeferredPolling();
+                return;
+            }
+            if (watchedDeferredDownloads.size > 0 || hasActiveDeferredWork(lastDeferredItems)) {
+                loadDeferredFiles();
+            }
+        });
     </script>
 </body>
 

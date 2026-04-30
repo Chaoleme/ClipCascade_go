@@ -105,6 +105,45 @@ func (h *WSHub) Broadcast(username string, sender *websocket.Conn, data []byte) 
 	}
 }
 
+// SendToUser 向给定用户的所有在线连接推送一条服务端生成的消息。
+func (h *WSHub) SendToUser(username string, data []byte) int {
+	h.mu.RLock()
+	conns, ok := h.connections[username]
+	if !ok {
+		h.mu.RUnlock()
+		return 0
+	}
+	type target struct {
+		conn *websocket.Conn
+		mu   *sync.Mutex
+	}
+	targets := make([]target, 0, len(conns))
+	for conn := range conns {
+		targets = append(targets, target{
+			conn: conn,
+			mu:   h.writeLocks[conn],
+		})
+	}
+	h.mu.RUnlock()
+
+	sent := 0
+	for _, t := range targets {
+		if t.mu == nil {
+			continue
+		}
+		t.mu.Lock()
+		err := t.conn.WriteMessage(websocket.TextMessage, data)
+		t.mu.Unlock()
+		if err != nil {
+			slog.Warn("WS：服务端推送写入错误", "用户名", username, "错误", err)
+			continue
+		}
+		h.totalOutboundMsgs.Add(1)
+		sent++
+	}
+	return sent
+}
+
 // HandleWebSocket 是 Fiber WebSocket 升级 handler。
 // 它处理类似 STOMP 的协议流程：
 //  1. Client 发送 CONNECT → server 回复 CONNECTED

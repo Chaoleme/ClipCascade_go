@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"mime"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
@@ -50,6 +51,9 @@ type Application struct {
 	lastRecvMu   sync.Mutex
 	lastRecvHash string
 	lastRecvTime time.Time
+
+	deferredMu    sync.Mutex
+	deferredFiles map[string]string
 }
 
 // New 创建一个新的 Application 实例。
@@ -58,11 +62,12 @@ func New(cfg *config.Config) *Application {
 	jar, _ := cookiejar.New(nil)
 
 	app := &Application{
-		cfg:    cfg,
-		clip:   clipboard.NewManager(),
-		tray:   ui.NewTray(),
-		ctx:    ctx,
-		cancel: cancel,
+		cfg:           cfg,
+		clip:          clipboard.NewManager(),
+		tray:          ui.NewTray(),
+		ctx:           ctx,
+		cancel:        cancel,
+		deferredFiles: make(map[string]string),
 		httpClient: &http.Client{
 			Jar:     jar,
 			Timeout: 15 * time.Second,
@@ -372,6 +377,9 @@ func (a *Application) onCopy(payload string, payloadType string, filename string
 	if payloadType == constants.TypeFileStub && a.tryRelayLargeFile(payload) {
 		return
 	}
+	if payloadType == constants.TypeFileStub && a.tryRegisterDeferredFile(payload) {
+		return
+	}
 
 	clipData := &protocol.ClipboardData{
 		Payload:  payload,
@@ -442,32 +450,10 @@ func (a *Application) onReceive(body string) {
 	a.lastRecvTime = now
 	a.lastRecvMu.Unlock()
 
-	var clipData *protocol.ClipboardData
-
-	if a.cfg.E2EEEnabled && a.encKey != nil {
-		// Decrypt
-		encrypted, err := pkgcrypto.DecodeFromJSONString(body)
-		if err != nil {
-			slog.Warn("解密解析失败", "错误", err)
-			return
-		}
-		plaintext, err := pkgcrypto.Decrypt(a.encKey, encrypted)
-		if err != nil {
-			slog.Warn("解密失败", "错误", err)
-			return
-		}
-		clipData, err = protocol.DecodeClipboardData(plaintext)
-		if err != nil {
-			slog.Warn("剪贴板数据解码失败", "错误", err)
-			return
-		}
-	} else {
-		var err error
-		clipData, err = protocol.DecodeClipboardData([]byte(body))
-		if err != nil {
-			slog.Warn("剪贴板数据解码失败", "错误", err)
-			return
-		}
+	clipData, err := a.decodeIncomingClipboardData(body)
+	if err != nil {
+		slog.Warn("剪贴板数据解码失败", "错误", err)
+		return
 	}
 
 	// Paste to local clipboard
@@ -476,25 +462,48 @@ func (a *Application) onReceive(body string) {
 		go a.handleFileOffer(clipData)
 		return
 	}
+	if clipData.Type == constants.TypeFileRequest {
+		go a.handleFileRequest(clipData)
+		return
+	}
 	a.clip.Paste(clipData.Payload, clipData.Type, clipData.FileName)
 	slog.Debug("应用：已接收并粘贴", "类型", clipData.Type, "大小", len(clipData.Payload))
+}
+
+func (a *Application) decodeIncomingClipboardData(body string) (*protocol.ClipboardData, error) {
+	if a.cfg.E2EEEnabled && a.encKey != nil && looksLikeEncryptedEnvelope(body) {
+		encrypted, err := pkgcrypto.DecodeFromJSONString(body)
+		if err != nil {
+			return nil, err
+		}
+		plaintext, err := pkgcrypto.Decrypt(a.encKey, encrypted)
+		if err != nil {
+			return nil, err
+		}
+		return protocol.DecodeClipboardData(plaintext)
+	}
+	return protocol.DecodeClipboardData([]byte(body))
+}
+
+func looksLikeEncryptedEnvelope(body string) bool {
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(body), &raw); err != nil {
+		return false
+	}
+	_, hasNonce := raw["nonce"]
+	_, hasCiphertext := raw["ciphertext"]
+	_, hasTag := raw["tag"]
+	return hasNonce && hasCiphertext && hasTag
 }
 
 // tryRelayLargeFile 检查 payload 是否为单个大文件，若是则在后台 goroutine 中
 // 异步上传并广播 FileOffer，返回 true 表示已接管（onCopy 无需再走 STOMP）。
 // 检查本身是同步的（只做 Stat），不会阻塞剪贴板监控 goroutine。
 func (a *Application) tryRelayLargeFile(payload string) bool {
-	paths := make([]string, 0, 1)
-	for _, line := range strings.Split(payload, "\n") {
-		line = strings.TrimSpace(line)
-		if line != "" {
-			paths = append(paths, line)
-		}
-	}
-	if len(paths) != 1 {
+	path, ok := extractSingleFilePath(payload)
+	if !ok {
 		return false
 	}
-	path := paths[0]
 	info, err := os.Stat(path)
 	if err != nil || info.IsDir() {
 		return false
@@ -506,6 +515,25 @@ func (a *Application) tryRelayLargeFile(payload string) bool {
 		return false
 	}
 	go a.relayLargeFile(path, info.Size())
+	return true
+}
+
+func (a *Application) tryRegisterDeferredFile(payload string) bool {
+	path, ok := extractSingleFilePath(payload)
+	if !ok {
+		return false
+	}
+	info, err := os.Stat(path)
+	if err != nil || info.IsDir() {
+		return false
+	}
+	if info.Size() <= constants.DefaultFileAutoRelayMaxBytes {
+		return false
+	}
+	if info.Size() > constants.DefaultFileRelayMaxBytes {
+		return false
+	}
+	go a.registerDeferredFile(path, info.Size())
 	return true
 }
 
@@ -547,6 +575,23 @@ func (a *Application) relayLargeFile(path string, fileSize int64) {
 	a.transferMgr.MarkCompleted(transferID)
 }
 
+func (a *Application) registerDeferredFile(path string, fileSize int64) {
+	record, err := transfer.RegisterDeferredFile(a.httpClient, a.cfg.ServerURL, &transfer.DeferredRegisterRequest{
+		FileName: filepath.Base(path),
+		FileSize: fileSize,
+		MimeType: detectDeferredMimeType(path),
+	})
+	if err != nil {
+		slog.Error("大文件登记失败", "path", path, "error", err)
+		ui.Notify("ClipCascade", fmt.Sprintf("大文件登记失败: %s", filepath.Base(path)))
+		return
+	}
+	a.rememberDeferredFile(record.DeferredID, path)
+	a.tray.SetStatus("Deferred File Ready")
+	ui.Notify("ClipCascade", fmt.Sprintf("大文件已登记到 Web: %s", record.FileName))
+	slog.Info("应用：大文件已登记到 Web 下载列表", "deferred_id", record.DeferredID, "文件名", record.FileName, "大小", fileSize)
+}
+
 func (a *Application) handleFileOffer(clipData *protocol.ClipboardData) {
 	var offer transfer.FileOfferPayload
 	if err := json.Unmarshal([]byte(clipData.Payload), &offer); err != nil {
@@ -581,6 +626,69 @@ func (a *Application) handleFileOffer(clipData *protocol.ClipboardData) {
 	a.transferMgr.MarkCompleted(transferID)
 }
 
+func (a *Application) handleFileRequest(clipData *protocol.ClipboardData) {
+	var req transfer.DeferredFileRequest
+	if err := json.Unmarshal([]byte(clipData.Payload), &req); err != nil {
+		slog.Warn("file request 解析失败", "error", err)
+		return
+	}
+	path, ok := a.lookupDeferredFile(req.DeferredID)
+	if !ok {
+		return
+	}
+	info, err := os.Stat(path)
+	if err != nil || info.IsDir() {
+		errMsg := "source file is no longer available"
+		if err != nil {
+			errMsg = err.Error()
+		}
+		_, _ = transfer.MarkDeferredFileFailed(a.httpClient, a.cfg.ServerURL, req.DeferredID, errMsg)
+		slog.Warn("应用：无法响应延迟下载请求", "deferred_id", req.DeferredID, "error", errMsg)
+		return
+	}
+
+	transferID := fmt.Sprintf("deferred-upload-%d", time.Now().UnixNano())
+	a.transferMgr.Start(transferID, transfer.DirectionUpload, filepath.Base(path), info.Size())
+	if _, err := transfer.MarkDeferredFileUploading(a.httpClient, a.cfg.ServerURL, req.DeferredID, 0); err != nil {
+		a.transferMgr.MarkFailed(transferID, err)
+		_, _ = transfer.MarkDeferredFileFailed(a.httpClient, a.cfg.ServerURL, req.DeferredID, err.Error())
+		slog.Error("应用：延迟下载上传状态初始化失败", "deferred_id", req.DeferredID, "error", err)
+		return
+	}
+	lastProgressAt := time.Time{}
+	lastProgressBytes := int64(-1)
+	result, err := transfer.UploadFile(a.fileHTTPClient, a.cfg.ServerURL, path, func(sent, total int64) {
+		a.transferMgr.UpdateProgress(transferID, sent, total)
+		if total > 0 && sent < total {
+			if sent == lastProgressBytes && time.Since(lastProgressAt) < time.Second {
+				return
+			}
+			if lastProgressAt.IsZero() || time.Since(lastProgressAt) >= time.Second || sent-lastProgressBytes >= 4*1024*1024 {
+				if _, progressErr := transfer.MarkDeferredFileUploading(a.httpClient, a.cfg.ServerURL, req.DeferredID, sent); progressErr != nil {
+					slog.Warn("应用：回报延迟下载进度失败", "deferred_id", req.DeferredID, "sent", sent, "error", progressErr)
+				} else {
+					lastProgressAt = time.Now()
+					lastProgressBytes = sent
+				}
+			}
+		}
+	})
+	if err != nil {
+		a.transferMgr.MarkFailed(transferID, err)
+		_, _ = transfer.MarkDeferredFileFailed(a.httpClient, a.cfg.ServerURL, req.DeferredID, err.Error())
+		slog.Error("应用：延迟下载上传失败", "deferred_id", req.DeferredID, "path", path, "error", err)
+		return
+	}
+	if _, err := transfer.MarkDeferredFileReady(a.httpClient, a.cfg.ServerURL, req.DeferredID, result.RelayID); err != nil {
+		a.transferMgr.MarkFailed(transferID, err)
+		_, _ = transfer.MarkDeferredFileFailed(a.httpClient, a.cfg.ServerURL, req.DeferredID, err.Error())
+		slog.Error("应用：延迟下载完成回写失败", "deferred_id", req.DeferredID, "relay_id", result.RelayID, "error", err)
+		return
+	}
+	a.transferMgr.MarkCompleted(transferID)
+	ui.Notify("ClipCascade", fmt.Sprintf("网页下载已准备: %s", result.FileName))
+}
+
 func sanitizeOfferName(name string) string {
 	name = filepath.Base(strings.TrimSpace(name))
 	name = strings.ReplaceAll(name, "\x00", "")
@@ -588,6 +696,40 @@ func sanitizeOfferName(name string) string {
 		return fmt.Sprintf("clipcascade-file-%d", time.Now().Unix())
 	}
 	return name
+}
+
+func (a *Application) rememberDeferredFile(deferredID string, path string) {
+	a.deferredMu.Lock()
+	defer a.deferredMu.Unlock()
+	a.deferredFiles[deferredID] = path
+}
+
+func (a *Application) lookupDeferredFile(deferredID string) (string, bool) {
+	a.deferredMu.Lock()
+	defer a.deferredMu.Unlock()
+	path, ok := a.deferredFiles[deferredID]
+	return path, ok
+}
+
+func detectDeferredMimeType(path string) string {
+	if mimeType := mime.TypeByExtension(strings.ToLower(filepath.Ext(path))); mimeType != "" {
+		return mimeType
+	}
+	return "application/octet-stream"
+}
+
+func extractSingleFilePath(payload string) (string, bool) {
+	paths := make([]string, 0, 1)
+	for _, line := range strings.Split(payload, "\n") {
+		line = strings.TrimSpace(line)
+		if line != "" {
+			paths = append(paths, line)
+		}
+	}
+	if len(paths) != 1 {
+		return "", false
+	}
+	return paths[0], true
 }
 
 // monitorConnection 检查连接健康状况并触发重连。

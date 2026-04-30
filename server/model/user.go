@@ -37,5 +37,5 @@ func (u *User) IsAdmin() bool {
 
 // InitDB 初始化数据库连接并自动迁移模型。
 func InitDB(db *gorm.DB) error {
-	return db.AutoMigrate(&User{}, &UserInfo{}, &FileTransfer{})
+	return db.AutoMigrate(&User{}, &UserInfo{}, &FileTransfer{}, &DeferredFile{})
 }

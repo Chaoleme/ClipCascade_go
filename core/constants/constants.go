@@ -79,7 +79,7 @@ const (
 	// DefaultFileAutoRelayMaxBytes 是 HTTP relay 自动同步的文件大小上限（25 MiB）。
 	// 超过此大小的文件不会自动传输，仅发送 TypeFileStub 占位通知。
 	DefaultFileAutoRelayMaxBytes int64 = 25 * 1024 * 1024
-	// DefaultFileRelayMaxBytes 是 HTTP 文件中转服务端允许的单文件最大大小。
+	// DefaultFileRelayMaxBytes 是 HTTP 文件中转服务端允许的单文件最大大小。（2G）
 	DefaultFileRelayMaxBytes int64 = 2 * 1024 * 1024 * 1024
 	// DefaultSessionTimeoutMin 是默认用户会话有效期 (约 1 年)。
 	DefaultSessionTimeoutMin = 525960

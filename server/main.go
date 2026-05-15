@@ -104,8 +104,9 @@ func main() {
 		}
 	}
 	app := fiber.New(fiber.Config{
-		Views:     engine,
-		BodyLimit: bodyLimit,
+		Views:             engine,
+		BodyLimit:         bodyLimit,
+		StreamRequestBody: true,
 	})
 
 	// 全局中间件

@@ -73,6 +73,10 @@ func getPlatformChangeCount() int64 {
 
 // getPlatformFilePaths 查询 Windows CF_HDROP 剪贴板。
 func getPlatformFilePaths() ([]string, error) {
+	// OpenClipboard/CloseClipboard must be called on the same OS thread.
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+
 	r, _, _ := procOpenClipboard.Call(0)
 	if r == 0 {
 		return nil, nil
@@ -263,6 +267,10 @@ func setPlatformImage(data []byte) error {
 }
 
 func readClipboardBytes(format uintptr) ([]byte, error) {
+	// OpenClipboard/CloseClipboard must be called on the same OS thread.
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+
 	r, _, err := procOpenClipboard.Call(0)
 	if r == 0 {
 		return nil, err

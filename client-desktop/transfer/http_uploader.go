@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 )
 
 func UploadFile(client *http.Client, serverURL string, path string, onProgress func(sent, total int64)) (*UploadResult, error) {
@@ -50,6 +51,7 @@ func UploadFile(client *http.Client, serverURL string, path string, onProgress f
 		return nil, err
 	}
 	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.Header.Set("X-File-Size", strconv.FormatInt(info.Size(), 10))
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
